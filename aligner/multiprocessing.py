@@ -105,7 +105,7 @@ def compile_train_graphs_func(directory, lang_directory, split_directory, job_na
     if debug:
         with open(log_path, 'w', encoding='utf8') as logf:
             with open(transition_path, 'w', encoding='utf8') as f:
-                subprocess.call([thirdparty_binary('show-transitions'), phones_file_path, mdl_path],
+                subprocess.check_call([thirdparty_binary('show-transitions'), phones_file_path, mdl_path],
                                 stdout=f, stderr=logf)
             parse_transitions(transition_path, triphones_file_path)
     log_path = os.path.join(directory, 'log', 'compile-graphs.0.{}.log'.format(job_name))
@@ -551,7 +551,7 @@ def ali_to_textgrid_func(align_config, model_directory, dictionary, corpus, job_
                                       stdin=lin_proc.stdout, stderr=logf)
         align_proc.communicate()
 
-        subprocess.call([thirdparty_binary('nbest-to-ctm'),
+        subprocess.check_call([thirdparty_binary('nbest-to-ctm'),
                          '--frame-shift={}'.format(frame_shift),
                          'ark:' + aligned_path,
                          word_ctm_path],
@@ -651,7 +651,7 @@ def tree_stats_func(directory, ci_phones, mdl, feat_path, ali_path, job_name):  
     treeacc_path = os.path.join(directory, '{}.treeacc'.format(job_name))
 
     with open(log_path, 'w', encoding='utf8') as logf:
-        subprocess.call([thirdparty_binary('acc-tree-stats')] + context_opts +
+        subprocess.check_call([thirdparty_binary('acc-tree-stats')] + context_opts +
                         ['--ci-phones=' + ci_phones, mdl, "scp:" + feat_path,
                          "ark:" + ali_path,
                          treeacc_path], stderr=logf)
@@ -701,7 +701,7 @@ def tree_stats(directory, align_directory, split_directory, ci_phones, num_jobs,
     tree_accs = [os.path.join(directory, '{}.treeacc'.format(x)) for x in range(num_jobs)]
     log_path = os.path.join(directory, 'log', 'sum_tree_acc.log')
     with open(log_path, 'w', encoding='utf8') as logf:
-        subprocess.call([thirdparty_binary('sum-tree-stats'), os.path.join(directory, 'treeacc')] +
+        subprocess.check_call([thirdparty_binary('sum-tree-stats'), os.path.join(directory, 'treeacc')] +
                         tree_accs, stderr=logf)
     # for f in tree_accs:
     #    os.remove(f)
@@ -716,7 +716,7 @@ def convert_alignments_func(directory, align_directory, job_name):  # pragma: no
 
     log_path = os.path.join(directory, 'log', 'convert.{}.log'.format(job_name))
     with open(log_path, 'w', encoding='utf8') as logf:
-        subprocess.call([thirdparty_binary('convert-ali'), ali_mdl_path,
+        subprocess.check_call([thirdparty_binary('convert-ali'), ali_mdl_path,
                          mdl_path, tree_path, "ark:" + ali_path,
                          "ark:" + new_ali_path], stderr=logf)
 
@@ -769,14 +769,14 @@ def calc_fmllr_func(directory, split_directory, sil_phones, job_name, config, in
     post_path = os.path.join(directory, 'post.{}'.format(job_name))
     weight_path = os.path.join(directory, 'weight.{}'.format(job_name))
     with open(log_path, 'w', encoding='utf8') as logf:
-        subprocess.call([thirdparty_binary('ali-to-post'),
+        subprocess.check_call([thirdparty_binary('ali-to-post'),
                          "ark:" + ali_path, 'ark:' + post_path], stderr=logf)
 
-        subprocess.call([thirdparty_binary('weight-silence-post'), '0.0',
+        subprocess.check_call([thirdparty_binary('weight-silence-post'), '0.0',
                          sil_phones, mdl_path, 'ark:' + post_path,
                          'ark:' + weight_path], stderr=logf)
 
-        subprocess.call([thirdparty_binary('gmm-est-fmllr'),
+        subprocess.check_call([thirdparty_binary('gmm-est-fmllr'),
                          '--verbose=4',
                          '--fmllr-update-type={}'.format(config.fmllr_update_type),
                          '--spk2utt=ark:' + spk2utt_path, mdl_path, "scp:" + feat_scp,
@@ -784,7 +784,7 @@ def calc_fmllr_func(directory, split_directory, sil_phones, job_name, config, in
                         stderr=logf)
 
         if not initial:
-            subprocess.call([thirdparty_binary('compose-transforms'),
+            subprocess.check_call([thirdparty_binary('compose-transforms'),
                              '--b-is-affine=true',
                              'ark:' + tmp_trans_path, 'ark:' + trans_path,
                              'ark:' + cmp_trans_path], stderr=logf)
@@ -799,7 +799,7 @@ def calc_fmllr_func(directory, split_directory, sil_phones, job_name, config, in
                                            config.feature_config.feature_id + '.{}.scp'.format(job_name))
         feat_fmllr_ark_path = os.path.join(config.corpus.split_directory(),
                                            config.feature_config.feature_id + '.{}.ark'.format(job_name))
-        subprocess.call([thirdparty_binary('transform-feats'),
+        subprocess.check_call([thirdparty_binary('transform-feats'),
                          '--utt2spk=ark:' + utt2spk_path,
                          'ark:' + trans_path, 'scp:' + base_scp,
                          'ark,scp:{},{}'.format(feat_fmllr_ark_path, feat_fmllr_scp_path)],
@@ -954,13 +954,13 @@ def calc_lda_mllt_func(directory, split_directory, sil_phones, job_name, config,
 
     # Estimating MLLT
     with open(log_path, 'a', encoding='utf8') as logf:
-        subprocess.call([thirdparty_binary('ali-to-post'),
+        subprocess.check_call([thirdparty_binary('ali-to-post'),
                          "ark:" + ali_path, 'ark:' + post_path], stderr=logf)
 
-        subprocess.call([thirdparty_binary('weight-silence-post'), '0.0',
+        subprocess.check_call([thirdparty_binary('weight-silence-post'), '0.0',
                          sil_phones, mdl_path, 'ark:' + post_path,
                          'ark:' + weight_path], stderr=logf)
-        subprocess.call([thirdparty_binary('gmm-acc-mllt'),
+        subprocess.check_call([thirdparty_binary('gmm-acc-mllt'),
                          '--rand-prune=' + str(config.random_prune),
                          mdl_path,
                          'scp:' + feat_path,
@@ -1026,17 +1026,17 @@ def calc_lda_mllt(directory, split_directory, sil_phones, num_jobs, config, init
         macc_list = []
         for x in range(num_jobs):
             macc_list.append(os.path.join(directory, '{}.{}.macc'.format(model_name, x)))
-        subprocess.call([thirdparty_binary('est-mllt'),
+        subprocess.check_call([thirdparty_binary('est-mllt'),
                          new_mat_path]
                         + macc_list,
                         stderr=logf)
-        subprocess.call([thirdparty_binary('gmm-transform-means'),
+        subprocess.check_call([thirdparty_binary('gmm-transform-means'),
                          new_mat_path,
                          mdl_path, mdl_path],
                         stderr=logf)
 
         if os.path.exists(previous_mat_path):
-            subprocess.call([thirdparty_binary('compose-transforms'),
+            subprocess.check_call([thirdparty_binary('compose-transforms'),
                              new_mat_path,
                              previous_mat_path,
                              composed_path],
@@ -1939,7 +1939,7 @@ def ali_to_textgrid_kaldi_func(ali_directory, model_directory, lang_dir, split_d
                                       stdin=lin_proc.stdout, stderr=logf)
         align_proc.communicate()
 
-        subprocess.call([thirdparty_binary('nbest-to-ctm'),
+        subprocess.check_call([thirdparty_binary('nbest-to-ctm'),
                          '--frame-shift={}'.format(frame_shift),
                          'ark:' + aligned_path,
                          word_ctm_path],

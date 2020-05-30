@@ -166,7 +166,7 @@ class SatTrainer(TriphoneTrainer):
         questions_path = os.path.join(self.train_directory, 'questions.int')
         questions_qst_path = os.path.join(self.train_directory, 'questions.qst')
         with open(log_path, 'w') as logf:
-            subprocess.call([thirdparty_binary('cluster-phones')] + context_opts +
+            subprocess.check_call([thirdparty_binary('cluster-phones')] + context_opts +
                             [treeacc_path, sets_int_path, questions_path], stderr=logf)
 
         with open(extra_question_int_path, 'r') as inf, \
@@ -176,13 +176,13 @@ class SatTrainer(TriphoneTrainer):
 
         log_path = os.path.join(self.log_directory, 'compile_questions.log')
         with open(log_path, 'w') as logf:
-            subprocess.call([thirdparty_binary('compile-questions')] + context_opts +
+            subprocess.check_call([thirdparty_binary('compile-questions')] + context_opts +
                             [topo_path, questions_path, questions_qst_path],
                             stderr=logf)
 
         log_path = os.path.join(self.log_directory, 'build_tree.log')
         with open(log_path, 'w') as logf:
-            subprocess.call([thirdparty_binary('build-tree')] + context_opts +
+            subprocess.check_call([thirdparty_binary('build-tree')] + context_opts +
                             ['--verbose=1', '--max-leaves={}'.format(self.initial_gaussians),
                              '--cluster-thresh={}'.format(self.cluster_threshold),
                              treeacc_path, roots_int_path, questions_qst_path,
@@ -192,13 +192,13 @@ class SatTrainer(TriphoneTrainer):
         occs_path = os.path.join(self.train_directory, '0.occs')
         mdl_path = os.path.join(self.train_directory, '0.mdl')
         with open(log_path, 'w') as logf:
-            subprocess.call([thirdparty_binary('gmm-init-model'),
+            subprocess.check_call([thirdparty_binary('gmm-init-model'),
                              '--write-occs=' + occs_path, tree_path, treeacc_path,
                              topo_path, mdl_path], stderr=logf)
 
         log_path = os.path.join(self.log_directory, 'mixup.log')
         with open(log_path, 'w') as logf:
-            subprocess.call([thirdparty_binary('gmm-mixup'),
+            subprocess.check_call([thirdparty_binary('gmm-mixup'),
                              '--mix-up={}'.format(self.initial_gaussians),
                              mdl_path, occs_path, mdl_path], stderr=logf)
         os.remove(treeacc_path)
