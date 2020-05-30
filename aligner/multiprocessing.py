@@ -794,7 +794,6 @@ def calc_fmllr_func(directory, split_directory, sil_phones, job_name, config, in
         else:
             trans_path = tmp_trans_path
         utt2spk_path = os.path.join(config.corpus.split_directory(), 'utt2spk.{}'.format(job_name))
-        base_scp = os.path.join(config.corpus.split_directory(), base_scp)
         feat_fmllr_scp_path = os.path.join(config.corpus.split_directory(),
                                            config.feature_config.feature_id + '.{}.scp'.format(job_name))
         feat_fmllr_ark_path = os.path.join(config.corpus.split_directory(),
