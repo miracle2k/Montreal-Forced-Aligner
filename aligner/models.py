@@ -117,7 +117,8 @@ class AcousticModel(Archive):
         return self._meta
 
     def add_lda_matrix(self, source):
-        copyfile(os.path.join(source, 'lda.mat'), os.path.join(self.dirname, 'lda.mat'))
+        if os.path.exists(os.path.join(source, 'lda.mat')):
+            copyfile(os.path.join(source, 'lda.mat'), os.path.join(self.dirname, 'lda.mat'))
 
     def add_ivector_model(self, source):
         copyfile(os.path.join(source, 'final.ie'), os.path.join(self.dirname, 'final.ie'))
@@ -136,10 +137,17 @@ class AcousticModel(Archive):
         """
         """
         os.makedirs(destination, exist_ok=True)
-        copyfile(os.path.join(self.dirname, 'final.mdl'), os.path.join(destination, 'final.mdl'))
-        if os.path.exists(os.path.join(self.dirname, 'final.occs')):
-            copyfile(os.path.join(self.dirname, 'final.occs'), os.path.join(destination, 'final.occs'))
-        copyfile(os.path.join(self.dirname, 'tree'), os.path.join(destination, 'tree'))
+        for (filename, allow_missing) in (
+            ('final.mdl', False),
+            ('tree', False),
+            ('final.occs', True),
+            ('lda.mat', True),  # LDA Matrix
+        ):
+            source_path = os.path.join(self.dirname, filename)
+            exists = os.path.exists(source_path)
+            if not exists and not allow_missing:
+                raise ValueError(f"{filename} missing in the model.")
+            copyfile(source_path, os.path.join(destination, filename))
 
     def validate(self, dictionary):
         if isinstance(dictionary, G2PModel):
@@ -221,7 +229,6 @@ class IvectorExtractor(Archive):
         os.makedirs(destination, exist_ok=True)
         copy(os.path.join(self.dirname, 'final.ie'), destination)           # i-vector extractor itself
         copy(os.path.join(self.dirname, 'final.dubm'), destination)         # Diag UBM itself
-        copy(os.path.join(self.dirname, 'lda.mat'), destination)          # LDA matrix
 
 
         # Write a "cmvn config" file (this is blank in the actual kaldi code, but it needs the argument passed)

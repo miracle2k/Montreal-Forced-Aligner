@@ -291,6 +291,7 @@ class BaseTrainer(object):
         basename, _ = os.path.splitext(filename)
         acoustic_model = AcousticModel.empty(basename)
         acoustic_model.add_meta_file(self)
+        acoustic_model.add_lda_matrix(self.corpus.output_directory)
         acoustic_model.add_model(self.train_directory)
         os.makedirs(directory, exist_ok=True)
         basename, _ = os.path.splitext(path)
