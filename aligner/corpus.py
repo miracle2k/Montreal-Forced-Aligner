@@ -215,7 +215,7 @@ class Corpus(object):
 
     '''
 
-    def __init__(self, directory, output_directory,
+    def __init__(self, directories, output_directory,
                  speaker_characters=0,
                  num_jobs=3, debug=False,
                  ignore_exceptions=False):
@@ -228,16 +228,15 @@ class Corpus(object):
         handler = logging.FileHandler(self.log_file, 'w', 'utf-8')
         handler.setFormatter = logging.Formatter('%(name)s %(message)s')
         root_logger.addHandler(handler)
-        if not os.path.exists(directory):
-            raise CorpusError('The directory \'{}\' does not exist.'.format(directory))
-        if not os.path.isdir(directory):
-            raise CorpusError('The specified path for the corpus ({}) is not a directory.'.format(directory))
+
+        if isinstance(directories, str):
+            directories = [directories]
+        
         if num_jobs < 1:
             num_jobs = 1
 
         print('Setting up corpus information...')
         root_logger.info('Setting up corpus information...')
-        self.directory = directory
         self.output_directory = os.path.join(output_directory, 'corpus_data')
         self.temp_directory = os.path.join(self.output_directory, 'temp')
         os.makedirs(self.temp_directory, exist_ok=True)
@@ -276,140 +275,141 @@ class Corpus(object):
         self.speaker_ordering = {}
         self.tg_count = 0
         self.lab_count = 0
-        for root, dirs, files in os.walk(self.directory, followlinks=True):
-            for f in sorted(files):
-                file_name, ext = os.path.splitext(f)
-                if ext.lower() != '.wav':
-                    if ext.lower() in ['.lab', '.textgrid']:
-                        wav_path = find_wav(f, files)
-                        if wav_path is None:
-                            self.transcriptions_without_wavs.append(os.path.join(root, f))
-                    continue
-                lab_name = find_lab(f, files)
-                wav_path = os.path.join(root, f)
-                try:
-                    sr = get_sample_rate(wav_path)
-                except wave.Error:
-                    self.wav_read_errors.append(wav_path)
-                    continue
-                if sr < 16000:
-                    self.unsupported_sample_rate.append(wav_path)
-                if lab_name is not None:
-                    utt_name = file_name
-                    if utt_name in self.utt_wav_mapping:
-                        ind = 0
-                        fixed_utt_name = utt_name
-                        while fixed_utt_name not in self.utt_wav_mapping:
-                            ind += 1
-                            fixed_utt_name = utt_name + '_{}'.format(ind)
-                        utt_name = fixed_utt_name
-                    if self.feat_mapping and utt_name not in self.feat_mapping:
-                        self.ignored_utterances.append(utt_name)
+        for directory in directories:
+            for root, dirs, files in os.walk(directory, followlinks=True):
+                for f in sorted(files):
+                    file_name, ext = os.path.splitext(f)
+                    if ext.lower() != '.wav':
+                        if ext.lower() in ['.lab', '.textgrid']:
+                            wav_path = find_wav(f, files)
+                            if wav_path is None:
+                                self.transcriptions_without_wavs.append(os.path.join(root, f))
                         continue
-                    lab_path = os.path.join(root, lab_name)
+                    lab_name = find_lab(f, files)
+                    wav_path = os.path.join(root, f)
                     try:
-                        text = load_text(lab_path)
-                    except UnicodeDecodeError:
-                        self.decode_error_files.append(lab_path)
+                        sr = get_sample_rate(wav_path)
+                    except wave.Error:
+                        self.wav_read_errors.append(wav_path)
                         continue
-                    words = parse_transcription(text)
-                    if not words:
-                        continue
-                    self.word_counts.update(words)
-                    self.text_mapping[utt_name] = ' '.join(words)
-                    if self.speaker_directories:
-                        speaker_name = os.path.basename(root)
-                    else:
-                        if isinstance(speaker_characters, int):
-                            speaker_name = f[:speaker_characters]
-                        elif speaker_characters == 'prosodylab':
-                            speaker_name = f.split('_')[1]
-                    speaker_name = speaker_name.strip().replace(' ', '_')
-                    utt_name = utt_name.strip().replace(' ', '_')
-                    self.speak_utt_mapping[speaker_name].append(utt_name)
-                    self.utt_wav_mapping[utt_name] = wav_path
-                    self.sample_rates[get_sample_rate(wav_path)].add(speaker_name)
-                    self.utt_speak_mapping[utt_name] = speaker_name
-                    self.file_directory_mapping[utt_name] = root.replace(self.directory, '').lstrip('/').lstrip('\\')
-
-                    self.lab_count += 1
-                else:
-                    tg_name = find_textgrid(f, files)
-                    if tg_name is None:
-                        self.no_transcription_files.append(wav_path)
-                        continue
-                    self.wav_files.append(file_name)
-                    self.wav_durations[file_name] = get_wav_duration(wav_path)
-                    tg_path = os.path.join(root, tg_name)
-                    tg = TextGrid()
-                    try:
-                        tg.read(tg_path)
-                    except Exception as e:
-                        exc_type, exc_value, exc_traceback = sys.exc_info()
-                        self.textgrid_read_errors[tg_path] = '\n'.join(
-                            traceback.format_exception(exc_type, exc_value, exc_traceback))
-                    n_channels = get_n_channels(wav_path)
-                    num_tiers = len(tg.tiers)
-                    if n_channels == 2:
-                        A_name = file_name + "_A"
-                        B_name = file_name + "_B"
-
-                        A_path, B_path = extract_temp_channels(wav_path, self.temp_directory)
-                    elif n_channels > 2:
-                        raise (Exception('More than two channels'))
-                    self.speaker_ordering[file_name] = []
-                    if not self.speaker_directories:
-                        if isinstance(speaker_characters, int):
-                            speaker_name = f[:speaker_characters]
-                        elif speaker_characters == 'prosodylab':
-                            speaker_name = f.split('_')[1]
-                        speaker_name = speaker_name.strip().replace(' ', '_')
-                        self.speaker_ordering[file_name].append(speaker_name)
-                    for i, ti in enumerate(tg.tiers):
-                        if ti.name.lower() == 'notes':
+                    if sr < 16000:
+                        self.unsupported_sample_rate.append(wav_path)
+                    if lab_name is not None:
+                        utt_name = file_name
+                        if utt_name in self.utt_wav_mapping:
+                            ind = 0
+                            fixed_utt_name = utt_name
+                            while fixed_utt_name not in self.utt_wav_mapping:
+                                ind += 1
+                                fixed_utt_name = utt_name + '_{}'.format(ind)
+                            utt_name = fixed_utt_name
+                        if self.feat_mapping and utt_name not in self.feat_mapping:
+                            self.ignored_utterances.append(utt_name)
                             continue
-                        if not isinstance(ti, IntervalTier):
+                        lab_path = os.path.join(root, lab_name)
+                        try:
+                            text = load_text(lab_path)
+                        except UnicodeDecodeError:
+                            self.decode_error_files.append(lab_path)
                             continue
+                        words = parse_transcription(text)
+                        if not words:
+                            continue
+                        self.word_counts.update(words)
+                        self.text_mapping[utt_name] = ' '.join(words)
                         if self.speaker_directories:
-                            speaker_name = ti.name.strip().replace(' ', '_')
-                            self.speaker_ordering[file_name].append(speaker_name)
+                            speaker_name = os.path.basename(root)
+                        else:
+                            if isinstance(speaker_characters, int):
+                                speaker_name = f[:speaker_characters]
+                            elif speaker_characters == 'prosodylab':
+                                speaker_name = f.split('_')[1]
+                        speaker_name = speaker_name.strip().replace(' ', '_')
+                        utt_name = utt_name.strip().replace(' ', '_')
+                        self.speak_utt_mapping[speaker_name].append(utt_name)
+                        self.utt_wav_mapping[utt_name] = wav_path
                         self.sample_rates[get_sample_rate(wav_path)].add(speaker_name)
-                        for interval in ti:
-                            text = interval.mark.lower().strip()
-                            words = parse_transcription(text)
-                            if not words:
-                                continue
-                            begin, end = round(interval.minTime, 4), round(interval.maxTime, 4)
-                            utt_name = '{}_{}_{}_{}'.format(speaker_name, file_name, begin, end)
-                            utt_name = utt_name.strip().replace(' ', '_').replace('.', '_')
-                            if n_channels == 1:
-                                if self.feat_mapping and utt_name not in self.feat_mapping:
-                                    self.ignored_utterances.append(utt_name)
-                                self.segments[utt_name] = '{} {} {}'.format(file_name, begin, end)
-                                self.utt_wav_mapping[file_name] = wav_path
-                            else:
-                                if i < num_tiers / 2:
-                                    utt_name += '_A'
-                                    if self.feat_mapping and utt_name not in self.feat_mapping:
-                                        self.ignored_utterances.append(utt_name)
-                                    self.segments[utt_name] = '{} {} {}'.format(A_name, begin, end)
-                                    self.utt_wav_mapping[A_name] = A_path
-                                else:
-                                    utt_name += '_B'
-                                    if self.feat_mapping and utt_name not in self.feat_mapping:
-                                        self.ignored_utterances.append(utt_name)
-                                    self.segments[utt_name] = '{} {} {}'.format(B_name, begin, end)
-                                    self.utt_wav_mapping[B_name] = B_path
-                            self.text_mapping[utt_name] = ' '.join(words)
-                            self.word_counts.update(words)
-                            self.utt_speak_mapping[utt_name] = speaker_name
-                            self.speak_utt_mapping[speaker_name].append(utt_name)
-                    if n_channels == 2:
-                        self.file_directory_mapping[A_name] = root.replace(self.directory, '').lstrip('/').lstrip('\\')
-                        self.file_directory_mapping[B_name] = root.replace(self.directory, '').lstrip('/').lstrip('\\')
+                        self.utt_speak_mapping[utt_name] = speaker_name
+                        self.file_directory_mapping[utt_name] = root.replace(directory, '').lstrip('/').lstrip('\\')
+
+                        self.lab_count += 1
                     else:
-                        self.file_directory_mapping[file_name] = root.replace(self.directory, '').lstrip('/').lstrip('\\')
-                    self.tg_count += 1
+                        tg_name = find_textgrid(f, files)
+                        if tg_name is None:
+                            self.no_transcription_files.append(wav_path)
+                            continue
+                        self.wav_files.append(file_name)
+                        self.wav_durations[file_name] = get_wav_duration(wav_path)
+                        tg_path = os.path.join(root, tg_name)
+                        tg = TextGrid()
+                        try:
+                            tg.read(tg_path)
+                        except Exception as e:
+                            exc_type, exc_value, exc_traceback = sys.exc_info()
+                            self.textgrid_read_errors[tg_path] = '\n'.join(
+                                traceback.format_exception(exc_type, exc_value, exc_traceback))
+                        n_channels = get_n_channels(wav_path)
+                        num_tiers = len(tg.tiers)
+                        if n_channels == 2:
+                            A_name = file_name + "_A"
+                            B_name = file_name + "_B"
+
+                            A_path, B_path = extract_temp_channels(wav_path, self.temp_directory)
+                        elif n_channels > 2:
+                            raise (Exception('More than two channels'))
+                        self.speaker_ordering[file_name] = []
+                        if not self.speaker_directories:
+                            if isinstance(speaker_characters, int):
+                                speaker_name = f[:speaker_characters]
+                            elif speaker_characters == 'prosodylab':
+                                speaker_name = f.split('_')[1]
+                            speaker_name = speaker_name.strip().replace(' ', '_')
+                            self.speaker_ordering[file_name].append(speaker_name)
+                        for i, ti in enumerate(tg.tiers):
+                            if ti.name.lower() == 'notes':
+                                continue
+                            if not isinstance(ti, IntervalTier):
+                                continue
+                            if self.speaker_directories:
+                                speaker_name = ti.name.strip().replace(' ', '_')
+                                self.speaker_ordering[file_name].append(speaker_name)
+                            self.sample_rates[get_sample_rate(wav_path)].add(speaker_name)
+                            for interval in ti:
+                                text = interval.mark.lower().strip()
+                                words = parse_transcription(text)
+                                if not words:
+                                    continue
+                                begin, end = round(interval.minTime, 4), round(interval.maxTime, 4)
+                                utt_name = '{}_{}_{}_{}'.format(speaker_name, file_name, begin, end)
+                                utt_name = utt_name.strip().replace(' ', '_').replace('.', '_')
+                                if n_channels == 1:
+                                    if self.feat_mapping and utt_name not in self.feat_mapping:
+                                        self.ignored_utterances.append(utt_name)
+                                    self.segments[utt_name] = '{} {} {}'.format(file_name, begin, end)
+                                    self.utt_wav_mapping[file_name] = wav_path
+                                else:
+                                    if i < num_tiers / 2:
+                                        utt_name += '_A'
+                                        if self.feat_mapping and utt_name not in self.feat_mapping:
+                                            self.ignored_utterances.append(utt_name)
+                                        self.segments[utt_name] = '{} {} {}'.format(A_name, begin, end)
+                                        self.utt_wav_mapping[A_name] = A_path
+                                    else:
+                                        utt_name += '_B'
+                                        if self.feat_mapping and utt_name not in self.feat_mapping:
+                                            self.ignored_utterances.append(utt_name)
+                                        self.segments[utt_name] = '{} {} {}'.format(B_name, begin, end)
+                                        self.utt_wav_mapping[B_name] = B_path
+                                self.text_mapping[utt_name] = ' '.join(words)
+                                self.word_counts.update(words)
+                                self.utt_speak_mapping[utt_name] = speaker_name
+                                self.speak_utt_mapping[speaker_name].append(utt_name)
+                        if n_channels == 2:
+                            self.file_directory_mapping[A_name] = root.replace(directory, '').lstrip('/').lstrip('\\')
+                            self.file_directory_mapping[B_name] = root.replace(directory, '').lstrip('/').lstrip('\\')
+                        else:
+                            self.file_directory_mapping[file_name] = root.replace(directory, '').lstrip('/').lstrip('\\')
+                        self.tg_count += 1
 
         self.issues_check = self.ignored_utterances or self.no_transcription_files or \
                        self.textgrid_read_errors or self.unsupported_sample_rate or self.decode_error_files

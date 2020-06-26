@@ -20,10 +20,10 @@ def align_corpus(args):
         temp_dir = TEMP_DIR
     else:
         temp_dir = os.path.expanduser(args.temp_directory)
-    corpus_name = os.path.basename(args.corpus_directory)
+    corpus_name = os.path.basename(args.corpus_directory[0])
     if corpus_name == '':
-        args.corpus_directory = os.path.dirname(args.corpus_directory)
-        corpus_name = os.path.basename(args.corpus_directory)
+        args.corpus_directory = os.path.dirname(args.corpus_directory[0])
+        corpus_name = os.path.basename(args.xcorpus_directory)
     data_directory = os.path.join(temp_dir, corpus_name)
     conf_path = os.path.join(data_directory, 'config.yml')
     if os.path.exists(conf_path):
@@ -80,10 +80,11 @@ def align_corpus(args):
 
 
 def validate_args(args):
-    if not os.path.exists(args.corpus_directory):
-        raise (ArgumentError('Could not find the corpus directory {}.'.format(args.corpus_directory)))
-    if not os.path.isdir(args.corpus_directory):
-        raise (ArgumentError('The specified corpus directory ({}) is not a directory.'.format(args.corpus_directory)))
+    for dir in args.corpus_directory:
+        if not os.path.exists(dir):
+            raise (ArgumentError('Could not find the corpus directory {}.'.format(dir)))
+        if not os.path.isdir(dir):
+            raise (ArgumentError('The specified corpus directory ({}) is not a directory.'.format(args.corpus_directory)))
     if not os.path.exists(args.dictionary_path):
         raise (ArgumentError('Could not find the dictionary file {}'.format(args.dictionary_path)))
     if not os.path.isfile(args.dictionary_path):
@@ -93,7 +94,7 @@ def validate_args(args):
 if __name__ == '__main__':  # pragma: no cover
     mp.freeze_support()
     parser = argparse.ArgumentParser()
-    parser.add_argument('corpus_directory', help='Full path to the source directory to align')
+    parser.add_argument('-c', '--corpus-directory', nargs='+', help='Full path to the source directory to align', required=True)
     parser.add_argument('dictionary_path', help='Full path to the pronunciation dictionary to use',
                         default='')
     parser.add_argument('output_directory', help="Full path to output directory, will be created if it doesn't exist")
@@ -108,7 +109,7 @@ if __name__ == '__main__':  # pragma: no cover
     parser.add_argument('-j', '--num_jobs', type=int, default=3,
                         help='Number of cores to use while aligning')
     parser.add_argument('-v', '--verbose', help="Output debug messages about alignment", action='store_true')
-    parser.add_argument('-c', '--clean', help="Remove files from previous runs", action='store_true')
+    parser.add_argument('--clean', help="Remove files from previous runs", action='store_true')
     parser.add_argument('-d', '--debug', help="Debug the aligner", action='store_true')
     parser.add_argument('--config_path', type=str, default='',
                         help='Path to config file to use for training and alignment')
@@ -123,7 +124,7 @@ if __name__ == '__main__':  # pragma: no cover
     validate_args(args)
 
     args.output_directory = args.output_directory.rstrip('/').rstrip('\\')
-    args.corpus_directory = args.corpus_directory.rstrip('/').rstrip('\\')
+    args.corpus_directory = list(map(lambda x: x.rstrip('/').rstrip('\\'), args.corpus_directory))
     if args.corpus_directory == args.output_directory:
         raise Exception('Corpus directory and output directory cannot be the same folder.')
 
